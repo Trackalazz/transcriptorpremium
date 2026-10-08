@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcriptor Pro Premium</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient-light: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+            --bg-gradient-dark: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            --glass-bg-light: rgba(255, 255, 255, 0.7);
+            --glass-bg-dark: rgba(30, 41, 59, 0.7);
+            --glass-border-light: rgba(255, 255, 255, 0.5);
+            --glass-border-dark: rgba(255, 255, 255, 0.1);
+            --text-light: #1e293b;
+            --text-dark: #f8fafc;
+            --primary: #3b82f6;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s ease, color 0.3s ease;
+            overflow: hidden;
+        }
+
+        body.light {
+            background: var(--bg-gradient-light);
+            color: var(--text-light);
+        }
+
+        body.dark {
+            background: var(--bg-gradient-dark);
+            color: var(--text-dark);
+        }
+
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        body.light .glass-panel {
+            background: var(--glass-bg-light);
+            border: 1px solid var(--glass-border-light);
+        }
+
+        body.dark .glass-panel {
+            background: var(--glass-bg-dark);
+            border: 1px solid var(--glass-border-dark);
+        }
+
+        textarea {
+            resize: none;
+            outline: none;
+            background: transparent;
+            width: 100%;
+            height: 100%;
+            font-size: 1.125rem;
+            line-height: 1.6;
+            padding: 1rem;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.5);
+            border-radius: 20px;
+        }
+
+        .mic-btn {
+            position: relative;
+            z-index: 50;
+            transition: transform 0.2s ease, background-color 0.3s ease;
+        }
+
+        .mic-btn:active {
+            transform: scale(0.95);
+        }
+
+        .pulse-animation {
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        #interim-container {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+        }
+
+        #interim-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="light">
+
+    <header class="glass-panel mx-4 mt-4 px-6 py-4 flex justify-between items-center z-10">
+        <h1 class="text-xl font-semibold tracking-tight">Transcriptor <span class="text-blue-500">Premium</span></h1>
+        <div class="flex items-center gap-3">
+            <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="Cambiar tema">
+                <svg id="theme-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <div class="mx-4 mt-3 flex gap-2 z-10 flex-wrap justify-center sm:justify-start">
+        <button onclick="copyText()" class="glass-panel px-4 py-2 flex items-center gap-2 hover:bg-white/50 dark:hover:bg-black/20 text-sm font-medium">
+            📋 Copiar
+        </button>
+        <button onclick="pasteText()" class="glass-panel px-4 py-2 flex items-center gap-2 hover:bg-white/50 dark:hover:bg-black/20 text-sm font-medium">
+            📥 Pegar
+        </button>
+        <button onclick="clearText()" class="glass-panel px-4 py-2 flex items-center gap-2 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 text-sm font-medium">
+            🗑️ Limpiar
+        </button>
+    </div>
+
+    <main class="flex-grow mx-4 mt-3 mb-24 relative flex flex-col">
+        <div class="glass-panel flex-grow relative overflow-hidden flex flex-col">
+            <textarea id="editor" class="w-full h-full text-gray-800 dark:text-gray-100" placeholder="Haz clic en cualquier parte de este editor para posicionar el cursor.&#10;&#10;Toca el micrófono y empieza a hablar. Puedes escribir y corregir con el teclado sin detener la grabación..."></textarea>
+            
+            <div class="absolute bottom-0 left-0 right-0 p-3 bg-white/30 dark:bg-black/30 backdrop-blur-sm border-t border-white/20 dark:border-white/5 flex justify-between text-xs font-medium text-gray-600 dark:text-gray-400">
+                <span id="metrics">0 palabras | 0 caracteres</span>
+                <span id="status-text" class="flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-gray-400" id="status-dot"></span> Pausado
+                </span>
+            </div>
+        </div>
+    </main>
+
+    <div class="fixed bottom-28 left-0 right-0 flex justify-center z-40 px-4">
+        <div id="interim-container" class="glass-panel bg-gray-900/80 dark:bg-gray-100/90 text-white dark:text-gray-900 px-6 py-3 max-w-lg w-full text-center shadow-lg border border-white/10 rounded-2xl">
+            <p id="interim-text" class="text-sm md:text-base italic opacity-90 tracking-wide"></p>
+        </div>
+    </div>
+
+    <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <button id="micBtn" onclick="toggleListening()" class="mic-btn w-16 h-16 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-xl flex items-center justify-center">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+        </button>
+    </div>
+
+    <script>
+        const editor = document.getElementById('editor');
+        const interimContainer = document.getElementById('interim-container');
+        const interimText = document.getElementById('interim-text');
+        const micBtn = document.getElementById('micBtn');
+        const statusText = document.getElementById('status-text');
+        const statusDot = document.getElementById('status-dot');
+        const metrics = document.getElementById('metrics');
+
+        let isListening = false;
+        let manualStop = true;
+        let recognition = null;
+        let isRecognizing = false;
+
+        // Configurar tema
+        function toggleTheme() {
+            const body = document.body;
+            if (body.classList.contains('light')) {
+                body.classList.remove('light');
+                body.classList.add('dark');
+            } else {
+                body.classList.remove('dark');
+                body.classList.add('light');
+            }
+        }
+
+        // Actualizar contadores
+        function updateMetrics() {
+            const text = editor.value;
+            const charCount = text.length;
+            const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+            metrics.innerText = `${wordCount} palabras | ${charCount} caracteres`;
+        }
+
+        editor.addEventListener('input', updateMetrics);
+        editor.addEventListener('keyup', updateMetrics);
+
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                alert("Tu navegador no soporta Web Speech API. Usa Chrome, Edge o Safari moderno.");
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'es-ES';
+
+            recognition.onstart = function() {
+                isRecognizing = true;
+                micBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                micBtn.classList.add('bg-red-500', 'hover:bg-red-600', 'pulse-animation');
+                micBtn.innerHTML = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                statusDot.classList.replace('bg-gray-400', 'bg-red-500');
+                statusText.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse" id="status-dot"></span> Escuchando...`;
+            };
+
+            recognition.onresult = function(event) {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+
+                // Mostrar texto provisional flotante
+                if (interimTranscript.trim().length > 0) {
+                    interimText.innerText = interimTranscript;
+                    interimContainer.classList.add('visible');
+                } else {
+                    interimContainer.classList.remove('visible');
+                }
+
+                // Insertar texto final en la posición del cursor
+                if (finalTranscript.trim().length > 0) {
+                    const formattedText = formatTranscription(finalTranscript);
+                    insertTextAtCursor(formattedText);
+                    interimContainer.classList.remove('visible');
+                    interimText.innerText = '';
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.error("Speech error: ", event.error);
+                if (event.error === 'not-allowed') {
+                    manualStop = true;
+                    stopListening();
+                    alert("Permiso de micrófono denegado.");
+                }
+            };
+
+            recognition.onend = function() {
+                isRecognizing = false;
+                if (!manualStop) {
+                    // Reiniciar automáticamente si el usuario no lo paró manualmente
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.log("Reinicio retrasado", e);
+                        setTimeout(() => {
+                            if (!manualStop && !isRecognizing) recognition.start();
+                        }, 500);
+                    }
+                } else {
+                    // UI para estado detenido
+                    micBtn.classList.remove('bg-red-500', 'hover:bg-red-600', 'pulse-animation');
+                    micBtn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                    micBtn.innerHTML = '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>';
+                    statusText.innerHTML = `<span class="w-2 h-2 rounded-full bg-gray-400" id="status-dot"></span> Pausado`;
+                    interimContainer.classList.remove('visible');
+                }
+            };
+        }
+
+        function formatTranscription(rawText) {
+            let processed = rawText.toLowerCase();
+
+            const replacements = [
+                { regex: /\b(punto y coma)\b/gi, replacement: ';' },
+                { regex: /\b(dos puntos)\b/gi, replacement: ':' },
+                { regex: /\b(punto)\b/gi, replacement: '.' },
+                { regex: /\b(coma)\b/gi, replacement: ',' },
+                { regex: /\b(raya|guion largo)\b/gi, replacement: '—' },
+                { regex: /\b(guion|guión)\b/gi, replacement: '-' },
+                { regex: /\b(abre interrogación|signo de interrogación abierto)\b/gi, replacement: '¿' },
+                { regex: /\b(cierra interrogación|signo de interrogación|interrogación)\b/gi, replacement: '?' },
+                { regex: /\b(abre exclamación|signo de exclamación abierto)\b/gi, replacement: '¡' },
+                { regex: /\b(cierra exclamación|exclamación|signo de exclamación)\b/gi, replacement: '!' },
+                { regex: /\b(abre paréntesis)\b/gi, replacement: '(' },
+                { regex: /\b(cierra paréntesis)\b/gi, replacement: ')' },
+                { regex: /\b(puntos suspensivos)\b/gi, replacement: '...' },
+                { regex: /\b(salto de línea)\b/gi, replacement: '\n' },
+                { regex: /\b(nuevo párrafo|salto de párrafo)\b/gi, replacement: '\n\n' },
+                { regex: /\b(salto de página)\b/gi, replacement: '\n\n--- Salto de Página ---\n\n' }
+            ];
+
+            replacements.forEach(item => {
+                processed = processed.replace(item.regex, item.replacement);
+            });
+
+            // Arreglar espacios
+            processed = processed.replace(/\s+([.,;:?!])/g, '$1'); 
+            processed = processed.replace(/([¿¡(])\s+/g, '$1'); 
+            
+            // Eliminar espacios al inicio de líneas creadas por comandos
+            processed = processed.replace(/\n\s+/g, '\n');
+
+            return processed;
+        }
+
+        function insertTextAtCursor(textToInsert) {
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const currentText = editor.value;
+
+            let finalString = textToInsert;
+            let needsCapitalization = false;
+
+            // Determinar si necesitamos espacio antes y si necesitamos mayúscula
+            if (start > 0) {
+                const prevChar = currentText.charAt(start - 1);
+                const nextIsPunct = /^[.,;:?!]/.test(finalString);
+                
+                // Añadir espacio si el carácter anterior no es un espacio/salto y lo nuevo no es puntuación pura
+                if (prevChar !== ' ' && prevChar !== '\n' && !nextIsPunct && finalString.trim() !== '') {
+                    finalString = ' ' + finalString;
+                }
+
+                // Comprobar si debemos poner mayúscula (después de punto o salto)
+                if (['.', '?', '!', '\n'].includes(prevChar) || (start > 1 && currentText.substring(start-2, start) === '\n\n')) {
+                    needsCapitalization = true;
+                }
+            } else {
+                needsCapitalization = true; // Principio del documento
+            }
+
+            // Aplicar mayúscula a la primera letra real del string resultante
+            if (needsCapitalization) {
+                finalString = finalString.replace(/[a-záéíóúüñ]/i, match => match.toUpperCase());
+            }
+
+            // Insertar texto empalmando las cadenas
+            const newText = currentText.substring(0, start) + finalString + currentText.substring(end);
+            editor.value = newText;
+
+            // Mover el cursor al final de lo insertado
+            const newCursorPos = start + finalString.length;
+            editor.selectionStart = newCursorPos;
+            editor.selectionEnd = newCursorPos;
+
+            // Auto-scroll al cursor
+            editor.blur(); 
+            editor.focus();
+
+            updateMetrics();
+        }
+
+        function toggleListening() {
+            if (!recognition) initSpeechRecognition();
+
+            if (isRecognizing) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function startListening() {
+            manualStop = false;
+            try {
+                recognition.start();
+            } catch (e) {
+                console.log("Ya estaba iniciado");
+            }
+        }
+
+        function stopListening() {
+            manualStop = true;
+            if (recognition) recognition.stop();
+        }
+
+        // Utilidades
+        function copyText() {
+            editor.select();
+            document.execCommand('copy');
+            editor.setSelectionRange(editor.selectionEnd, editor.selectionEnd); // deseleccionar
+            
+            const original = metrics.innerText;
+            metrics.innerText = '¡Copiado!';
+            metrics.style.color = 'var(--primary)';
+            setTimeout(() => {
+                metrics.style.color = '';
+                updateMetrics();
+            }, 2000);
+        }
+
+        async function pasteText() {
+            try {
+                const text = await navigator.clipboard.readText();
+                insertTextAtCursor(text);
+            } catch (err) {
+                // Fallback para navegadores estrictos
+                editor.focus();
+                document.execCommand('paste');
+            }
+        }
+
+        function clearText() {
+            // Animación de limpieza
+            editor.style.opacity = '0';
+            setTimeout(() => {
+                editor.value = '';
+                updateMetrics();
+                editor.style.opacity = '1';
+                editor.focus();
+            }, 200);
+        }
+
+        // Auto-focus al iniciar
+        window.onload = function() {
+            editor.focus();
+        };
+    </script>
+</body>
+</html>
